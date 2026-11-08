@@ -1,0 +1,202 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Concrete Mix Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column, inputs first, live results directly below. Teal accent on stone neutrals. */
+:root{
+  --bg:#f2f3f1; --surface:#ffffff; --fg:#1c2226; --muted:#5b646b; --line:#d8dcda;
+  --accent:#0f6b73; --accent-fg:#ffffff; --soft:#e4eded; --warn:#a4372a;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#13181b; --surface:#1b2125; --fg:#e8ebed; --muted:#98a2a9; --line:#2d353a;
+    --accent:#52b8c1; --accent-fg:#0a1d20; --soft:#1e2d2f; --warn:#f08c7d; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#13181b; --surface:#1b2125; --fg:#e8ebed; --muted:#98a2a9; --line:#2d353a;
+  --accent:#52b8c1; --accent-fg:#0a1d20; --soft:#1e2d2f; --warn:#f08c7d; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--sans); font-size:16px; line-height:1.5;
+  padding-block:24px 40px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+main{max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:20px}
+header h1{font-size:1.6rem; line-height:1.2; margin:0 0 4px; font-weight:600; text-wrap:balance}
+header p{margin:0; color:var(--muted); font-size:.95rem}
+section{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px}
+h2{font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 14px; font-weight:600}
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px 16px}
+.field{display:flex; flex-direction:column; gap:6px; min-width:0}
+.field>label,.field>span.lab{font-size:.9rem; font-weight:500}
+.field small{color:var(--muted); font-size:.78rem}
+input[type=number]{
+  font:inherit; font-family:var(--mono); color:var(--fg); background:var(--bg);
+  border:1px solid var(--line); border-radius:6px; padding:9px 10px; width:100%; min-width:0;
+}
+input:focus-visible,.seg input:focus-visible+label{outline:2px solid var(--accent); outline-offset:2px}
+.seg{display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:var(--bg)}
+.seg input{position:absolute; opacity:0; pointer-events:none}
+.seg label{flex:1; text-align:center; padding:9px 6px; font-size:.9rem; cursor:pointer; border-left:1px solid var(--line); user-select:none}
+.seg input:first-child+label{border-left:0}
+.seg input:checked+label{background:var(--accent); color:var(--accent-fg); font-weight:600}
+.full{grid-column:1/-1}
+#error{color:var(--warn); font-size:.92rem; margin:0; min-height:1.4em}
+.facts{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px}
+.fact{background:var(--soft); border-radius:8px; padding:10px 12px; min-width:0}
+.fact b{display:block; font-family:var(--mono); font-size:1.1rem; font-weight:500}
+.fact span{font-size:.75rem; color:var(--muted)}
+.rows{display:grid; grid-template-columns:1fr auto auto; align-items:baseline}
+.rows>div{padding:11px 0; border-top:1px solid var(--line)}
+.rows>div:nth-child(3n+2),.rows>div:nth-child(3n){padding-left:20px}
+.rows .h{border-top:0; padding-top:0; padding-bottom:6px; font-size:.75rem; color:var(--muted); text-align:right}
+.rows .h:first-child{text-align:left}
+.rows .n{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:1.15rem; font-weight:500}
+.rows .n.b{color:var(--muted); font-size:1rem}
+.ratio{margin:16px 0 0; font-family:var(--mono); font-size:.95rem}
+.ratio span{color:var(--muted); font-family:var(--sans); font-size:.8rem; display:block}
+.note{font-size:.8rem; color:var(--muted); margin:0}
+@media (max-width:420px){ .facts{grid-template-columns:1fr 1fr 1fr; gap:8px} .fact b{font-size:1rem} }
+@media (prefers-reduced-motion:no-preference){ .seg label{transition:background .12s} }
+</style>
+
+<main>
+  <header>
+    <h1>Concrete Mix Calculator</h1>
+    <p>Quantities for one cubic metre of concrete, from strength, slump, aggregate size and exposure.</p>
+  </header>
+
+  <section aria-labelledby="h-in">
+    <h2 id="h-in">Design inputs</h2>
+    <div class="grid">
+      <div class="field">
+        <label for="fck">Strength (MPa)</label>
+        <input id="fck" type="number" inputmode="decimal" value="25" min="10" max="30" step="any">
+        <small>10 to 30 MPa</small>
+      </div>
+      <div class="field">
+        <label for="slump">Slump (mm)</label>
+        <input id="slump" type="number" inputmode="decimal" value="100" min="25" max="175" step="any">
+        <small>25 to 175 mm</small>
+      </div>
+      <div class="field">
+        <label for="fm">Sand fineness modulus</label>
+        <input id="fm" type="number" inputmode="decimal" value="2.8" min="2.4" max="3" step="any">
+        <small>2.4 to 3.0, default 2.8</small>
+      </div>
+      <div class="field">
+        <label for="vol">Batch volume (m³)</label>
+        <input id="vol" type="number" inputmode="decimal" value="1" min="0.01" step="any">
+        <small>For the batch column</small>
+      </div>
+      <div class="field full">
+        <span class="lab" id="agg-l">Maximum aggregate size (mm)</span>
+        <div class="seg" role="radiogroup" aria-labelledby="agg-l">
+          <input type="radio" name="agg" id="agg10" value="10"><label for="agg10">10</label>
+          <input type="radio" name="agg" id="agg20" value="20" checked><label for="agg20">20</label>
+          <input type="radio" name="agg" id="agg40" value="40"><label for="agg40">40</label>
+        </div>
+      </div>
+      <div class="field full">
+        <span class="lab" id="exp-l">Exposure</span>
+        <div class="seg" role="radiogroup" aria-labelledby="exp-l">
+          <input type="radio" name="exp" id="expMild" value="mild"><label for="expMild">Mild</label>
+          <input type="radio" name="exp" id="expModerate" value="moderate" checked><label for="expModerate">Moderate</label>
+          <input type="radio" name="exp" id="expSevere" value="severe"><label for="expSevere">Severe</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <p id="error" role="alert"></p>
+
+  <section id="result" aria-labelledby="h-out">
+    <h2 id="h-out">Mix proportions</h2>
+    <div class="facts">
+      <div class="fact"><b id="r-target">–</b><span>Target mean, MPa</span></div>
+      <div class="fact"><b id="r-wc">–</b><span>Water-cement ratio</span></div>
+      <div class="fact"><b id="r-air">–</b><span>Entrapped air, %</span></div>
+    </div>
+    <div class="rows">
+      <div class="h">Material</div><div class="h">Per m³</div><div class="h" id="batch-h">Batch</div>
+      <div>Cement</div><div class="n" id="r-cement">–</div><div class="n b" id="b-cement">–</div>
+      <div>Water</div><div class="n" id="r-water">–</div><div class="n b" id="b-water">–</div>
+      <div>Fine aggregate (sand)</div><div class="n" id="r-fine">–</div><div class="n b" id="b-fine">–</div>
+      <div>Coarse aggregate</div><div class="n" id="r-coarse">–</div><div class="n b" id="b-coarse">–</div>
+    </div>
+    <p class="ratio"><span>Mix ratio by weight (cement : sand : coarse)</span><b id="r-ratio">–</b></p>
+  </section>
+
+  <p class="note">All quantities in kg, aggregates oven-dry. Simplified ACI 211.1 absolute volume method for non-air-entrained concrete. Adjust for aggregate moisture and always verify with trial mixes in the lab.</p>
+</main>
+
+<script>
+var WC_TABLE=[[15,.79],[20,.69],[25,.61],[30,.54],[35,.47],[40,.42]];
+var MAX_WC={mild:.60,moderate:.50,severe:.45};
+var MIN_CEMENT={mild:260,moderate:300,severe:340};
+var SLUMP_POINTS=[37.5,87.5,162.5];
+var WATER={10:[207,228,243],20:[190,205,216],40:[166,181,190]};
+var AIR={10:3,20:2,40:1};
+var FM_POINTS=[2.4,2.6,2.8,3.0];
+var COARSE_VOL={10:[.50,.48,.46,.44],20:[.66,.64,.62,.60],40:[.76,.74,.72,.70]};
+var SG_C=3.15, SG_F=2.60, SG_CA=2.65, BULK=1600;
+
+function interpolate(x,pts){
+  if(!(pts[0][0]<=x && x<=pts[pts.length-1][0])) throw new Error("Value "+x+" is outside the supported range.");
+  for(var i=0;i<pts.length-1;i++){
+    var a=pts[i], b=pts[i+1];
+    if(a[0]<=x && x<=b[0]) return a[1]+(b[1]-a[1])*(x-a[0])/(b[0]-a[0]);
+  }
+}
+function zip(xs,ys){return xs.map(function(x,i){return [x,ys[i]]})}
+function targetMean(f){ if(f<21) return f+7; if(f<=35) return f+8.3; return 1.1*f+5; }
+function calculate(fck,slump,agg,exp,fm){
+  if(!(fck>=10 && fck<=30)) throw new Error("Strength must be between 10 and 30 MPa.");
+  if(!(slump>=25 && slump<=175)) throw new Error("Slump must be between 25 and 175 mm.");
+  if(!(fm>=2.4 && fm<=3.0)) throw new Error("Fineness modulus must be between 2.4 and 3.0.");
+  var fcr=targetMean(fck);
+  var wc=Math.min(interpolate(fcr,WC_TABLE),MAX_WC[exp]);
+  var s=Math.min(Math.max(slump,SLUMP_POINTS[0]),SLUMP_POINTS[2]);
+  var water=interpolate(s,zip(SLUMP_POINTS,WATER[agg]));
+  var cement=Math.max(water/wc,MIN_CEMENT[exp]);
+  wc=water/cement;
+  var air=AIR[agg]/100;
+  var coarse=interpolate(fm,zip(FM_POINTS,COARSE_VOL[agg]))*BULK;
+  var used=cement/(SG_C*1000)+water/1000+air+coarse/(SG_CA*1000);
+  var fv=1-used;
+  if(fv<=0) throw new Error("These inputs leave no room for fine aggregate.");
+  return {target:fcr,wc:wc,cement:cement,water:water,fine:fv*SG_F*1000,coarse:coarse,air:air*100};
+}
+function num(id){var v=document.getElementById(id).value.trim(); return v===""?NaN:parseFloat(v)}
+function chosen(name){return document.querySelector('input[name="'+name+'"]:checked').value}
+function set(id,t){document.getElementById(id).textContent=t}
+function update(){
+  var err=document.getElementById("error"), res=document.getElementById("result");
+  var fmRaw=document.getElementById("fm").value.trim();
+  var fck=num("fck"), slump=num("slump"), fm=fmRaw===""?2.8:parseFloat(fmRaw), vol=num("vol");
+  try{
+    if(isNaN(fck)||isNaN(slump)||isNaN(fm)) throw new Error("Enter a number in every field.");
+    if(!(vol>0)) throw new Error("Batch volume must be greater than 0.");
+    var m=calculate(fck,slump,parseInt(chosen("agg"),10),chosen("exp"),fm);
+    var d=vol<1?1:0;
+    err.textContent=""; res.hidden=false;
+    set("r-target",m.target.toFixed(1)); set("r-wc",m.wc.toFixed(2)); set("r-air",m.air.toFixed(1));
+    set("r-cement",m.cement.toFixed(0)); set("r-water",m.water.toFixed(0));
+    set("r-fine",m.fine.toFixed(0)); set("r-coarse",m.coarse.toFixed(0));
+    set("b-cement",(m.cement*vol).toFixed(d)); set("b-water",(m.water*vol).toFixed(d));
+    set("b-fine",(m.fine*vol).toFixed(d)); set("b-coarse",(m.coarse*vol).toFixed(d));
+    set("batch-h",(+vol.toFixed(2))+" m³");
+    set("r-ratio","1 : "+(m.fine/m.cement).toFixed(2)+" : "+(m.coarse/m.cement).toFixed(2));
+  }catch(e){ err.textContent=e.message; res.hidden=true; }
+}
+document.querySelectorAll("input").forEach(function(i){i.addEventListener("input",update)});
+update();
+</script>
+
+</body></html>
